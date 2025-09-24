@@ -14,8 +14,6 @@ Original file is located at
 # Using Naive Bayes at each step
 # ============================================
 
-!pip install scikit-learn pandas nltk spacy textblob
-!python -m spacy download en_core_web_sm
 
 import pandas as pd
 import numpy as np
