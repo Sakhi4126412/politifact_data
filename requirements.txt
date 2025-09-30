@@ -6,3 +6,4 @@ textblob==0.17.1
 imbalanced-learn==1.12.1
 matplotlib==3.8.0
 https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.6.1/en_core_web_sm-3.6.1-py3-none-any.whl
+
