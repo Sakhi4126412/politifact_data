@@ -1,5 +1,5 @@
 # ============================================
-# 📌 Streamlit NLP Phase-wise with All Models + SMOTE
+# 📌 Streamlit NLP Phase-wise with All Models + SMOTE + Fix for Errors
 # ============================================
 
 import streamlit as st
@@ -104,7 +104,7 @@ st.markdown("### 📁 Data, Assemble!")
 uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
 
 if uploaded_file:
-    st.success("Awesome!!File uploaded successfully!")
+    st.success("Awesome!! File uploaded successfully!")
     df = pd.read_csv(uploaded_file)
 
     st.markdown("### ⚙️ Configuration")
@@ -159,6 +159,11 @@ if uploaded_file:
 
         # Convert results to DataFrame
         results_df = pd.DataFrame(list(results.items()), columns=["Model", "Accuracy"])
+
+        # 🔥 Fix: Coerce non-numeric values (errors) to NaN → 0
+        results_df["Accuracy"] = pd.to_numeric(results_df["Accuracy"], errors="coerce")
+        results_df["Accuracy"] = results_df["Accuracy"].fillna(0)
+
         results_df = results_df.sort_values(by="Accuracy", ascending=False).reset_index(drop=True)
 
         # Display results
@@ -214,7 +219,7 @@ if uploaded_file:
         st.pyplot(fig)
         
         # Display metrics in a row
-        st.write("### 🏆Operational Benchmarks")
+        st.write("### 🏆 Operational Benchmarks")
         cols = st.columns(4)
         for idx, (model, accuracy) in enumerate(zip(results_df["Model"], results_df["Accuracy"])):
             with cols[idx]:
