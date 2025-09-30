@@ -109,7 +109,7 @@ with tabs[5]:
     st.plotly_chart(fig_target, use_container_width=True)
 
 # -------------------------------
-# Fake News Detection Models
+# Fake News Detection Models (Updated)
 # -------------------------------
 st.markdown("---")
 st.subheader("🤖 Model Training & Recommendation")
@@ -134,11 +134,20 @@ if len(y_train.unique()) > 1:
     smote = SMOTE(random_state=42)
     X_train, y_train = smote.fit_resample(X_train, y_train)
 
+# Import additional models
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+
 # Define models
 models = {
-    "Logistic Regression": LogisticRegression(max_iter=500),
+    "Logistic Regression": LogisticRegression(max_iter=500, random_state=42),
     "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
-    "XGBoost": XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42)
+    "Naive Bayes": MultinomialNB(),
+    "Support Vector Machine": SVC(probability=True, random_state=42),
+    "Decision Tree": DecisionTreeClassifier(random_state=42),
+    "K-Nearest Neighbors": KNeighborsClassifier(n_neighbors=5)
 }
 
 results = {}
@@ -148,9 +157,13 @@ for name, model in models.items():
     acc = accuracy_score(y_test, y_pred)
     results[name] = acc
 
-# Display results
+# Display results as dataframe and bar chart
 results_df = pd.DataFrame(list(results.items()), columns=["Model", "Accuracy"])
 st.dataframe(results_df)
+
+fig_acc = px.bar(results_df, x="Model", y="Accuracy", text="Accuracy", 
+                 title="Model Accuracy Comparison", color="Accuracy", color_continuous_scale='Viridis')
+st.plotly_chart(fig_acc, use_container_width=True)
 
 best_model = max(results, key=results.get)
 st.success(f"🏆 Recommended Model: **{best_model}** with Accuracy {results[best_model]*100:.2f}%")
