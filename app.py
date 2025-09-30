@@ -1,272 +1,116 @@
-{
- "cells": [
-  {
-   "cell_type": "code",
-   "execution_count": 5,
-   "id": "4b41d215-648f-4ace-9c39-a0b45e16b53d",
-   "metadata": {},
-   "outputs": [
-    {
-     "name": "stderr",
-     "output_type": "stream",
-     "text": [
-      "[nltk_data] Downloading package punkt to\n",
-      "[nltk_data]     C:\\Users\\vaira\\AppData\\Roaming\\nltk_data...\n",
-      "[nltk_data]   Package punkt is already up-to-date!\n",
-      "[nltk_data] Downloading package wordnet to\n",
-      "[nltk_data]     C:\\Users\\vaira\\AppData\\Roaming\\nltk_data...\n",
-      "[nltk_data]   Package wordnet is already up-to-date!\n",
-      "[nltk_data] Downloading package stopwords to\n",
-      "[nltk_data]     C:\\Users\\vaira\\AppData\\Roaming\\nltk_data...\n",
-      "[nltk_data]   Package stopwords is already up-to-date!\n"
-     ]
-    },
-    {
-     "name": "stdout",
-     "output_type": "stream",
-     "text": [
-      "Dataset Shape: (7470, 5)\n",
-      "Columns: Index(['Statement', 'Speaker', 'Rating', 'Date', 'BinaryTarget'], dtype='object')\n",
-      "                                           Statement          Speaker  \\\n",
-      "0  There was not “a single, prominent conservativ...     Sean Hannity   \n",
-      "1  Former President Barack Obama eliminated a law...     Social Media   \n",
-      "2  “Republicans are spiking health insurance prem...  Katherine Clark   \n",
-      "3  “North Carolina has just approved a law permit...          X posts   \n",
-      "4  Former North Carolina Gov. Roy Cooper “bears d...  Michael Whatley   \n",
-      "\n",
-      "        Rating                Date  BinaryTarget  \n",
-      "0        FALSE  September 18, 2025             0  \n",
-      "1        FALSE  September 17, 2025             0  \n",
-      "2  mostly-true  September 17, 2025             1  \n",
-      "3  barely-true  September 16, 2025             1  \n",
-      "4        FALSE  September 12, 2025             0  \n",
-      "\n",
-      "🔹 Lexical & Morphological Analysis Accuracy: 0.8005\n",
-      "              precision    recall  f1-score   support\n",
-      "\n",
-      "           0       0.89      0.85      0.87      1145\n",
-      "           1       0.56      0.65      0.60       349\n",
-      "\n",
-      "    accuracy                           0.80      1494\n",
-      "   macro avg       0.73      0.75      0.74      1494\n",
-      "weighted avg       0.81      0.80      0.81      1494\n",
-      "\n",
-      "\n",
-      "🔹 Syntactic Analysis Accuracy: 0.7544\n",
-      "              precision    recall  f1-score   support\n",
-      "\n",
-      "           0       0.82      0.88      0.85      1145\n",
-      "           1       0.47      0.35      0.40       349\n",
-      "\n",
-      "    accuracy                           0.75      1494\n",
-      "   macro avg       0.64      0.61      0.62      1494\n",
-      "weighted avg       0.73      0.75      0.74      1494\n",
-      "\n",
-      "\n",
-      "🔹 Semantic Analysis Accuracy: 0.7671\n",
-      "              precision    recall  f1-score   support\n",
-      "\n",
-      "           0       0.77      1.00      0.87      1145\n",
-      "           1       0.56      0.01      0.03       349\n",
-      "\n",
-      "    accuracy                           0.77      1494\n",
-      "   macro avg       0.66      0.51      0.45      1494\n",
-      "weighted avg       0.72      0.77      0.67      1494\n",
-      "\n",
-      "\n",
-      "🔹 Discourse Integration Accuracy: 0.7691\n",
-      "              precision    recall  f1-score   support\n",
-      "\n",
-      "           0       0.79      0.94      0.86      1145\n",
-      "           1       0.51      0.20      0.29       349\n",
-      "\n",
-      "    accuracy                           0.77      1494\n",
-      "   macro avg       0.65      0.57      0.58      1494\n",
-      "weighted avg       0.73      0.77      0.73      1494\n",
-      "\n",
-      "\n",
-      "🔹 Pragmatic Analysis Accuracy: 0.7651\n",
-      "              precision    recall  f1-score   support\n",
-      "\n",
-      "           0       0.77      1.00      0.87      1145\n",
-      "           1       0.00      0.00      0.00       349\n",
-      "\n",
-      "    accuracy                           0.77      1494\n",
-      "   macro avg       0.38      0.50      0.43      1494\n",
-      "weighted avg       0.59      0.77      0.66      1494\n",
-      "\n",
-      "\n",
-      "📊 Phase-wise Naive Bayes Accuracies:\n",
-      "1. Lexical & Morphological: 0.8005\n",
-      "2. Syntactic: 0.7544\n",
-      "3. Semantic: 0.7671\n",
-      "4. Discourse: 0.7691\n",
-      "5. Pragmatic: 0.7651\n"
-     ]
+# ============================================
+# 📌 Streamlit NLP Phase-wise with All Models + SMOTE
+# ============================================
+
+import streamlit as st
+import pandas as pd
+import spacy
+from spacy.lang.en.stop_words import STOP_WORDS
+from textblob import TextBlob
+
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
+
+from imblearn.over_sampling import SMOTE   # ✅ NEW
+
+import matplotlib.pyplot as plt
+
+# ============================
+# Load SpaCy & Globals
+# ============================
+nlp = spacy.load("en_core_web_sm")
+stop_words = STOP_WORDS
+
+# ============================
+# Phase Feature Extractors
+# ============================
+def lexical_preprocess(text):
+    """Tokenization + Stopwords removal + Lemmatization"""
+    doc = nlp(text.lower())
+    tokens = [token.lemma_ for token in doc if token.text not in stop_words and token.is_alpha]
+    return " ".join(tokens)
+
+def syntactic_features(text):
+    """Part-of-Speech tags"""
+    doc = nlp(text)
+    pos_tags = " ".join([token.pos_ for token in doc])
+    return pos_tags
+
+def semantic_features(text):
+    """Sentiment polarity & subjectivity"""
+    blob = TextBlob(text)
+    return [blob.sentiment.polarity, blob.sentiment.subjectivity]
+
+def discourse_features(text):
+    """Sentence count + first word of each sentence"""
+    doc = nlp(text)
+    sentences = [sent.text.strip() for sent in doc.sents]
+    return f"{len(sentences)} {' '.join([s.split()[0] for s in sentences if len(s.split()) > 0])}"
+
+pragmatic_words = ["must", "should", "might", "could", "will", "?", "!"]
+def pragmatic_features(text):
+    """Counts of modality & special words"""
+    text = text.lower()
+    return [text.count(w) for w in pragmatic_words]
+
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from imblearn.over_sampling import SMOTE
+
+# ============================
+# Train & Evaluate All Models (with SMOTE + Full Metrics)
+# ============================
+def evaluate_models(X_features, y):
+    results = []
+    models = {
+        "Naive Bayes": MultinomialNB(),
+        "Decision Tree": DecisionTreeClassifier(),
+        "Logistic Regression": LogisticRegression(max_iter=200),
+        "SVM": SVC()
     }
-   ],
-   "source": [
-    "\"\"\"\n",
-    "LSSDP: NLP-Based Fake vs Real Detection\n",
-    "\n",
-    "This script implements a phase-wise NLP pipeline for Fake vs Real statement classification\n",
-    "using Naive Bayes. It covers 5 phases of NLP:\n",
-    "1. Lexical & Morphological Analysis\n",
-    "2. Syntactic Analysis\n",
-    "3. Semantic Analysis\n",
-    "4. Discourse Integration\n",
-    "5. Pragmatic Analysis\n",
-    "\"\"\"\n",
-    "\n",
-    "import pandas as pd\n",
-    "import numpy as np\n",
-    "import nltk, re, string, spacy\n",
-    "from nltk.corpus import stopwords\n",
-    "from nltk.stem import WordNetLemmatizer\n",
-    "from textblob import TextBlob\n",
-    "\n",
-    "from sklearn.model_selection import train_test_split\n",
-    "from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer\n",
-    "from sklearn.naive_bayes import MultinomialNB\n",
-    "from sklearn.metrics import accuracy_score, classification_report\n",
-    "\n",
-    "# ============================\n",
-    "# Download resources (only first time)\n",
-    "# ============================\n",
-    "nltk.download('punkt')\n",
-    "nltk.download('wordnet')\n",
-    "nltk.download('stopwords')\n",
-    "\n",
-    "# Load spaCy model\n",
-    "nlp = spacy.load(\"en_core_web_sm\")\n",
-    "\n",
-    "# ============================\n",
-    "# Step 1: Load Dataset\n",
-    "# ============================\n",
-    "DATA_PATH = r\"C:\\Users\\vaira\\Downloads\\politifact_full (1).csv\"   # <-- update with your dataset path\n",
-    "\n",
-    "df = pd.read_csv(DATA_PATH)\n",
-    "\n",
-    "print(\"Dataset Shape:\", df.shape)\n",
-    "print(\"Columns:\", df.columns)\n",
-    "print(df.head())\n",
-    "\n",
-    "X = df['Statement']\n",
-    "y = df['BinaryTarget']\n",
-    "\n",
-    "# ============================\n",
-    "# Helper: Train NB Model\n",
-    "# ============================\n",
-    "def train_nb(X_features, y, name):\n",
-    "    X_train, X_test, y_train, y_test = train_test_split(\n",
-    "        X_features, y, test_size=0.2, random_state=42\n",
-    "    )\n",
-    "    model = MultinomialNB()\n",
-    "    model.fit(X_train, y_train)\n",
-    "    y_pred = model.predict(X_test)\n",
-    "    acc = accuracy_score(y_test, y_pred)\n",
-    "    print(f\"\\n🔹 {name} Accuracy: {acc:.4f}\")\n",
-    "    print(classification_report(y_test, y_pred))\n",
-    "    return acc\n",
-    "\n",
-    "# ============================\n",
-    "# Phase 1: Lexical & Morphological Analysis\n",
-    "# ============================\n",
-    "lemmatizer = WordNetLemmatizer()\n",
-    "stop_words = set(stopwords.words('english'))\n",
-    "\n",
-    "def lexical_preprocess(text):\n",
-    "    tokens = nltk.word_tokenize(text.lower())\n",
-    "    tokens = [\n",
-    "        lemmatizer.lemmatize(w) for w in tokens\n",
-    "        if w not in stop_words and w not in string.punctuation\n",
-    "    ]\n",
-    "    return \" \".join(tokens)\n",
-    "\n",
-    "X_lexical = X.apply(lexical_preprocess)\n",
-    "vec_lexical = CountVectorizer().fit_transform(X_lexical)\n",
-    "acc1 = train_nb(vec_lexical, y, \"Lexical & Morphological Analysis\")\n",
-    "\n",
-    "# ============================\n",
-    "# Phase 2: Syntactic Analysis\n",
-    "# ============================\n",
-    "def syntactic_features(text):\n",
-    "    doc = nlp(text)\n",
-    "    pos_tags = \" \".join([token.pos_ for token in doc])\n",
-    "    return pos_tags\n",
-    "\n",
-    "X_syntax = X.apply(syntactic_features)\n",
-    "vec_syntax = CountVectorizer().fit_transform(X_syntax)\n",
-    "acc2 = train_nb(vec_syntax, y, \"Syntactic Analysis\")\n",
-    "\n",
-    "# ============================\n",
-    "# Phase 3: Semantic Analysis\n",
-    "# ============================\n",
-    "def semantic_features(text):\n",
-    "    blob = TextBlob(text)\n",
-    "    return f\"{blob.sentiment.polarity} {blob.sentiment.subjectivity}\"\n",
-    "\n",
-    "X_semantic = X.apply(semantic_features)\n",
-    "vec_semantic = TfidfVectorizer().fit_transform(X_semantic)\n",
-    "acc3 = train_nb(vec_semantic, y, \"Semantic Analysis\")\n",
-    "\n",
-    "# ============================\n",
-    "# Phase 4: Discourse Integration\n",
-    "# ============================\n",
-    "def discourse_features(text):\n",
-    "    sentences = nltk.sent_tokenize(text)\n",
-    "    return f\"{len(sentences)} {' '.join([s.split()[0] for s in sentences if len(s.split())>0])}\"\n",
-    "\n",
-    "X_discourse = X.apply(discourse_features)\n",
-    "vec_discourse = CountVectorizer().fit_transform(X_discourse)\n",
-    "acc4 = train_nb(vec_discourse, y, \"Discourse Integration\")\n",
-    "\n",
-    "# ============================\n",
-    "# Phase 5: Pragmatic Analysis\n",
-    "# ============================\n",
-    "pragmatic_words = [\"must\", \"should\", \"might\", \"could\", \"will\", \"?\", \"!\"]\n",
-    "\n",
-    "def pragmatic_features(text):\n",
-    "    features = []\n",
-    "    for w in pragmatic_words:\n",
-    "        features.append(f\"{w}_{text.lower().count(w)}\")\n",
-    "    return \" \".join(features)\n",
-    "\n",
-    "X_pragmatic = X.apply(pragmatic_features)\n",
-    "vec_pragmatic = CountVectorizer().fit_transform(X_pragmatic)\n",
-    "acc5 = train_nb(vec_pragmatic, y, \"Pragmatic Analysis\")\n",
-    "\n",
-    "# ============================\n",
-    "# Final Results\n",
-    "# ============================\n",
-    "print(\"\\n📊 Phase-wise Naive Bayes Accuracies:\")\n",
-    "print(f\"1. Lexical & Morphological: {acc1:.4f}\")\n",
-    "print(f\"2. Syntactic: {acc2:.4f}\")\n",
-    "print(f\"3. Semantic: {acc3:.4f}\")\n",
-    "print(f\"4. Discourse: {acc4:.4f}\")\n",
-    "print(f\"5. Pragmatic: {acc5:.4f}\")\n"
-   ]
-  }
- ],
- "metadata": {
-  "kernelspec": {
-   "display_name": "Python 3 (ipykernel)",
-   "language": "python",
-   "name": "python3"
-  },
-  "language_info": {
-   "codemirror_mode": {
-    "name": "ipython",
-    "version": 3
-   },
-   "file_extension": ".py",
-   "mimetype": "text/x-python",
-   "name": "python",
-   "nbconvert_exporter": "python",
-   "pygments_lexer": "ipython3",
-   "version": "3.12.5"
-  }
- },
- "nbformat": 4,
- "nbformat_minor": 5
-}
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_features, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    # ✅ Apply SMOTE on training data
+    try:
+        smote = SMOTE(random_state=42)
+        X_train, y_train = smote.fit_resample(X_train, y_train)
+    except Exception as e:
+        st.warning(f"⚠️ SMOTE failed: {str(e)}")
+
+    for name, model in models.items():
+        try:
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
+
+            acc = accuracy_score(y_test, y_pred) * 100
+            prec = precision_score(y_test, y_pred, average="weighted", zero_division=0) * 100
+            rec = recall_score(y_test, y_pred, average="weighted", zero_division=0) * 100
+            f1 = f1_score(y_test, y_pred, average="weighted", zero_division=0) * 100
+
+            results.append({
+                "Model": name,
+                "Accuracy": round(acc, 2),
+                "Precision": round(prec, 2),
+                "Recall": round(rec, 2),
+                "F1-Score": round(f1, 2)
+            })
+        except Exception as e:
+            results.append({
+                "Model": name,
+                "Accuracy": f"Error: {str(e)}",
+                "Precision": "-",
+                "Recall": "-",
+                "F1-Score": "-"
+            })
+
+    return pd.DataFrame(results)
+
+
+# ✅ Rest of your Streamlit UI code remains SAME
