@@ -1,7 +1,9 @@
 streamlit
 pandas
-scikit-learn
 spacy
 textblob
-matplotlib
+scikit-learn
 imbalanced-learn
+matplotlib
+
+
