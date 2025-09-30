@@ -1,5 +1,5 @@
 # ============================================
-# 📌 Streamlit NLP Phase-wise with All Models + SMOTE + Full Metrics
+# 📌 Streamlit NLP Phase-wise with All Models + SMOTE
 # ============================================
 
 import streamlit as st
@@ -14,9 +14,9 @@ from sklearn.naive_bayes import MultinomialNB
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score
 
-from imblearn.over_sampling import SMOTE
+from imblearn.over_sampling import SMOTE   # ✅ NEW
 
 import matplotlib.pyplot as plt
 
@@ -59,10 +59,10 @@ def pragmatic_features(text):
     return [text.count(w) for w in pragmatic_words]
 
 # ============================
-# Train & Evaluate All Models (with SMOTE + Full Metrics)
+# Train & Evaluate All Models (with SMOTE)
 # ============================
 def evaluate_models(X_features, y):
-    results = []
+    results = {}
     models = {
         "Naive Bayes": MultinomialNB(),
         "Decision Tree": DecisionTreeClassifier(),
@@ -85,29 +85,12 @@ def evaluate_models(X_features, y):
         try:
             model.fit(X_train, y_train)
             y_pred = model.predict(X_test)
-
             acc = accuracy_score(y_test, y_pred) * 100
-            prec = precision_score(y_test, y_pred, average="weighted", zero_division=0) * 100
-            rec = recall_score(y_test, y_pred, average="weighted", zero_division=0) * 100
-            f1 = f1_score(y_test, y_pred, average="weighted", zero_division=0) * 100
-
-            results.append({
-                "Model": name,
-                "Accuracy": round(acc, 2),
-                "Precision": round(prec, 2),
-                "Recall": round(rec, 2),
-                "F1-Score": round(f1, 2)
-            })
+            results[name] = round(acc, 2)
         except Exception as e:
-            results.append({
-                "Model": name,
-                "Accuracy": f"Error: {str(e)}",
-                "Precision": "-",
-                "Recall": "-",
-                "F1-Score": "-"
-            })
+            results[name] = f"Error: {str(e)}"
 
-    return pd.DataFrame(results)
+    return results
 
 # ============================
 # Streamlit UI
@@ -121,7 +104,7 @@ st.markdown("### 📁 Data, Assemble!")
 uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
 
 if uploaded_file:
-    st.success("Awesome!! File uploaded successfully!")
+    st.success("Awesome!!File uploaded successfully!")
     df = pd.read_csv(uploaded_file)
 
     st.markdown("### ⚙️ Configuration")
@@ -171,43 +154,44 @@ if uploaded_file:
                 X_features = pd.DataFrame(X.apply(pragmatic_features).tolist(),
                                         columns=pragmatic_words)
 
-            # Run all models
-            results_df = evaluate_models(X_features, y)
+            # Run all models (with SMOTE balancing)
+            results = evaluate_models(X_features, y)
 
-        # Sort by F1-Score
-        results_df = results_df.sort_values(by="F1-Score", ascending=False).reset_index(drop=True)
+        # Convert results to DataFrame
+        results_df = pd.DataFrame(list(results.items()), columns=["Model", "Accuracy"])
+        results_df = results_df.sort_values(by="Accuracy", ascending=False).reset_index(drop=True)
 
         # Display results
         st.write("---")
-        st.subheader("📊 Brainpower Breakdown (Based on F1-Score)")
+        st.subheader("📊 Brainpower Breakdown")
         
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
         
-        # Enhanced Bar Chart (F1-Score)
+        # Enhanced Bar Chart
         colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4']
-        bars = ax1.bar(results_df["Model"], results_df["F1-Score"], 
+        bars = ax1.bar(results_df["Model"], results_df["Accuracy"], 
                       color=colors, alpha=0.9, edgecolor='darkgray', linewidth=1.5)
         
         # Highlight the best model
-        best_idx = results_df["F1-Score"].idxmax()
+        best_idx = results_df["Accuracy"].idxmax()
         bars[best_idx].set_color('#FFD93D')
         bars[best_idx].set_edgecolor('black')
         bars[best_idx].set_linewidth(2)
 
         # Add value labels on bars
-        for i, (model, f1) in enumerate(zip(results_df["Model"], results_df["F1-Score"])):
-            ax1.text(i, f1 + 1, f'{f1:.1f}%', ha='center', va='bottom', 
+        for i, (model, acc) in enumerate(zip(results_df["Model"], results_df["Accuracy"])):
+            ax1.text(i, acc + 1, f'{acc:.1f}%', ha='center', va='bottom', 
                     fontsize=12, fontweight='bold', color='black')
         
-        ax1.set_ylabel('F1-Score (%)', fontsize=12, fontweight='bold')
+        ax1.set_ylabel('Accuracy (%)', fontsize=12, fontweight='bold')
         ax1.set_title(f'Model Performance - {phase}\n', fontsize=14, fontweight='bold')
-        ax1.set_ylim(0, min(100, max(results_df["F1-Score"]) + 15))
+        ax1.set_ylim(0, min(100, max(results_df["Accuracy"]) + 15))
         ax1.grid(axis='y', alpha=0.3)
         ax1.tick_params(axis='x', rotation=15)
         
-        # Donut Chart for performance distribution (F1-Score)
+        # Donut Chart for performance distribution
         wedges, texts, autotexts = ax2.pie(
-            results_df["F1-Score"], 
+            results_df["Accuracy"], 
             labels=results_df["Model"], 
             autopct='%1.1f%%',
             startangle=90,
@@ -218,41 +202,41 @@ if uploaded_file:
         centre_circle = plt.Circle((0, 0), 0.70, fc='white')
         ax2.add_artist(centre_circle)
 
+        # Enhance text
         for autotext in autotexts:
             autotext.set_color('black')
             autotext.set_fontweight('bold')
             autotext.set_fontsize(11)
         
-        ax2.set_title('Performance Distribution (F1-Score)\n', fontsize=14, fontweight='bold')
+        ax2.set_title('Performance Distribution (Donut Chart)\n', fontsize=14, fontweight='bold')
         
         plt.tight_layout()
         st.pyplot(fig)
         
         # Display metrics in a row
-        st.write("### 🏆 Operational Benchmarks")
-        cols = st.columns(len(results_df))
-        for idx, row in results_df.iterrows():
+        st.write("### 🏆Operational Benchmarks")
+        cols = st.columns(4)
+        for idx, (model, accuracy) in enumerate(zip(results_df["Model"], results_df["Accuracy"])):
             with cols[idx]:
                 if idx == best_idx:
                     st.metric(
-                        label=f"🥇 {row['Model']}",
-                        value=f"{row['F1-Score']:.1f}%",
+                        label=f"🥇 {model}",
+                        value=f"{accuracy:.1f}%",
                         delta="Best Performance"
                     )
                 else:
                     st.metric(
-                        label=row['Model'],
-                        value=f"{row['F1-Score']:.1f}%",
-                        delta=f"{-round(row['F1-Score'] - results_df.loc[best_idx, 'F1-Score'], 1)}%"
+                        label=model,
+                        value=f"{accuracy:.1f}%",
+                        delta=f"{-round(accuracy - results_df.loc[best_idx, 'Accuracy'], 1)}%"
                     )
         
         # Detailed results table
         st.write("### 📋 The Inside Scoop")
         results_display = results_df.copy()
-        for col in ["Accuracy", "Precision", "Recall", "F1-Score"]:
-            results_display[col] = results_display[col].apply(lambda x: f"{x:.1f}%" if isinstance(x, (int, float)) else x)
+        results_display["Accuracy"] = results_display["Accuracy"].apply(lambda x: f"{x:.1f}%")
         results_display["Rank"] = range(1, len(results_display) + 1)
-        results_display = results_display[["Rank", "Model", "Accuracy", "Precision", "Recall", "F1-Score"]]
+        results_display = results_display[["Rank", "Model", "Accuracy"]]
         st.dataframe(results_display, use_container_width=True)
 
 else:
