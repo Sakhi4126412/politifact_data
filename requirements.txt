@@ -1,8 +1,7 @@
-streamlit==1.39.0
-pandas==2.2.3
-spacy==3.7.4
-textblob==0.18.0.post0
-scikit-learn==1.5.2
-matplotlib==3.9.2
-imblearn==0.0
-imbalanced-learn==0.12.3
+streamlit
+pandas
+scikit-learn
+spacy
+textblob
+matplotlib
+imbalanced-learn
