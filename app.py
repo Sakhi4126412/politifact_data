@@ -1,224 +1,133 @@
 # ============================================
 # 📌 Streamlit NLP Phase-wise with All Models + SMOTE + Safe Splitting
 # ============================================
-
 import streamlit as st
 import pandas as pd
 import spacy
-from spacy.lang.en.stop_words import STOP_WORDS
-from textblob import TextBlob
-
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import classification_report, accuracy_score
+import plotly.express as px
+from wordcloud import WordCloud
+from io import BytesIO
 
-from imblearn.over_sampling import SMOTE
-
-import matplotlib.pyplot as plt
-
-# ============================
-# Load SpaCy & Globals
-# ============================
+# Load SpaCy model
 nlp = spacy.load("en_core_web_sm")
-stop_words = STOP_WORDS
 
-# ============================
-# Phase Feature Extractors
-# ============================
-def lexical_preprocess(text):
-    doc = nlp(text.lower())
-    tokens = [token.lemma_ for token in doc if token.text not in stop_words and token.is_alpha]
-    return " ".join(tokens)
+st.set_page_config(page_title="Fake News Detection & NLP Analysis", layout="wide")
+st.title("📰 Fake News Detection & NLP Phase Analysis")
 
-def syntactic_features(text):
-    doc = nlp(text)
-    pos_tags = " ".join([token.pos_ for token in doc])
-    return pos_tags
-
-def semantic_features(text):
-    blob = TextBlob(text)
-    return [blob.sentiment.polarity, blob.sentiment.subjectivity]
-
-def discourse_features(text):
-    doc = nlp(text)
-    sentences = [sent.text.strip() for sent in doc.sents]
-    return f"{len(sentences)} {' '.join([s.split()[0] for s in sentences if len(s.split()) > 0])}"
-
-pragmatic_words = ["must", "should", "might", "could", "will", "?", "!"]
-def pragmatic_features(text):
-    text = text.lower()
-    return [text.count(w) for w in pragmatic_words]
-
-# ============================
-# Train & Evaluate All Models (with SMOTE & Safe Split)
-# ============================
-def evaluate_models(X_features, y):
-    results = {}
-    models = {
-        "Naive Bayes": MultinomialNB(),
-        "Decision Tree": DecisionTreeClassifier(),
-        "Logistic Regression": LogisticRegression(max_iter=200),
-        "SVM": SVC()
-    }
-
-    # ✅ Safe train-test split
-    try:
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_features, y, test_size=0.2, random_state=42, stratify=y
-        )
-    except ValueError:
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_features, y, test_size=0.2, random_state=42
-        )
-
-    # ✅ Apply SMOTE only on training data
-    try:
-        smote = SMOTE(random_state=42)
-        X_train, y_train = smote.fit_resample(X_train, y_train)
-    except Exception as e:
-        st.warning(f"⚠️ SMOTE failed: {str(e)}")
-
-    # Train each model
-    for name, model in models.items():
-        try:
-            model.fit(X_train, y_train)
-            y_pred = model.predict(X_test)
-            acc = accuracy_score(y_test, y_pred) * 100
-            results[name] = round(acc, 2)
-        except Exception as e:
-            results[name] = f"Error"
-
-    return results
-
-# ============================
-# Streamlit UI
-# ============================
-st.set_page_config(page_title="NLP Phase Analysis", layout="wide")
-st.title("📊 Rumor Buster")
-
-st.markdown("### 📁 Upload Your CSV")
-uploaded_file = st.file_uploader("Choose CSV file", type=["csv"])
+# Upload CSV
+st.markdown("<h5 style='text-align: center; color: grey;'>Upload your dataset (CSV)</h5>", unsafe_allow_html=True)
+uploaded_file = st.file_uploader("", type=['csv'], label_visibility="collapsed")
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
-    st.success("File uploaded successfully!")
-    st.dataframe(df.head(), use_container_width=True)
+    st.success("✅ Dataset Loaded Successfully!")
+    st.subheader("Dataset Preview")
+    st.dataframe(df.head())
 
-    st.markdown("### ⚙️ Configuration")
-    text_col = st.selectbox("Select Text Column:", df.columns)
-    target_col = st.selectbox("Select Target Column:", df.columns)
-    phase = st.selectbox("Select NLP Phase:", [
-        "Lexical & Morphological",
-        "Syntactic", 
-        "Semantic",
-        "Discourse",
-        "Pragmatic"
-    ])
-    run_analysis = st.button("Run Analysis", type="primary")
+    # Select feature & target columns
+    feature_col = st.selectbox("Select Feature Column (Text Column)", df.columns)
+    target_col = st.selectbox("Select Target Column", df.columns)
 
-    if run_analysis:
-        st.write(f"### 🔍 Analysis: {phase}")
-        X = df[text_col].astype(str)
-        y = df[target_col]
+    st.markdown("---")
+    st.subheader("NLP Phase-wise Analysis")
 
-        # Extract features
-        if phase == "Lexical & Morphological":
-            X_processed = X.apply(lexical_preprocess)
-            X_features = CountVectorizer().fit_transform(X_processed)
+    # ===== Tabs for NLP Phases =====
+    tabs = st.tabs(["Lexical/Morphological", "Syntactic", "Semantic", "Pragmatic", "Discourse", "Target Distribution"])
+    
+    # ===== Lexical & Morphological =====
+    with tabs[0]:
+        st.markdown("### 1️⃣ Lexical & Morphological Analysis")
+        df['word_count'] = df[feature_col].apply(lambda x: len(str(x).split()))
+        df['char_count'] = df[feature_col].apply(lambda x: len(str(x)))
 
-        elif phase == "Syntactic":
-            X_processed = X.apply(syntactic_features)
-            X_features = CountVectorizer().fit_transform(X_processed)
+        col1, col2 = st.columns(2)
+        fig1 = px.histogram(df, x='word_count', nbins=20, title="Word Count Distribution", color_discrete_sequence=['teal'])
+        fig2 = px.histogram(df, x='char_count', nbins=20, title="Character Count Distribution", color_discrete_sequence=['orange'])
+        col1.plotly_chart(fig1, use_container_width=True)
+        col2.plotly_chart(fig2, use_container_width=True)
 
-        elif phase == "Semantic":
-            X_features = pd.DataFrame(X.apply(semantic_features).tolist(),
-                                      columns=["polarity", "subjectivity"])
+    # ===== Syntactic Analysis =====
+    with tabs[1]:
+        st.markdown("### 2️⃣ Syntactic Analysis (POS Tags)")
+        def pos_tags(text):
+            doc = nlp(str(text))
+            return [token.pos_ for token in doc]
+        df['pos_tags'] = df[feature_col].apply(pos_tags)
+        pos_list = [tag for sublist in df['pos_tags'] for tag in sublist]
+        pos_df = pd.Series(pos_list).value_counts().reset_index()
+        pos_df.columns = ['POS', 'Count']
 
-        elif phase == "Discourse":
-            X_processed = X.apply(discourse_features)
-            X_features = CountVectorizer().fit_transform(X_processed)
+        fig_pos = px.bar(pos_df, x='POS', y='Count', title="POS Tag Distribution", color='Count', color_continuous_scale='Viridis')
+        st.plotly_chart(fig_pos, use_container_width=True)
 
-        elif phase == "Pragmatic":
-            X_features = pd.DataFrame(X.apply(pragmatic_features).tolist(),
-                                      columns=pragmatic_words)
+    # ===== Semantic Analysis =====
+    with tabs[2]:
+        st.markdown("### 3️⃣ Semantic Analysis (WordCloud)")
+        text = " ".join(df[feature_col].astype(str))
+        wc = WordCloud(width=800, height=400, background_color="white", colormap="plasma").generate(text)
+        st.image(wc.to_array())
 
-        # Evaluate models
-        results = evaluate_models(X_features, y)
+    # ===== Pragmatic Analysis =====
+    with tabs[3]:
+        st.markdown("### 4️⃣ Pragmatic Analysis (Sentence Length)")
+        df['sentence_length'] = df[feature_col].apply(lambda x: len(str(x).split()))
+        fig_prag = px.histogram(df, x='sentence_length', nbins=20, title="Sentence Length Distribution", color_discrete_sequence=['skyblue'])
+        st.plotly_chart(fig_prag, use_container_width=True)
 
-        # Convert results to DataFrame and handle errors
-        results_df = pd.DataFrame(list(results.items()), columns=["Model", "Accuracy"])
-        results_df["Accuracy_numeric"] = pd.to_numeric(results_df["Accuracy"], errors="coerce")
-        results_df["Accuracy_numeric"] = results_df["Accuracy_numeric"].fillna(0)
-        results_df = results_df.sort_values(by="Accuracy_numeric", ascending=False).reset_index(drop=True)
-        best_idx = results_df["Accuracy_numeric"].idxmax()
+    # ===== Discourse Integration =====
+    with tabs[4]:
+        st.markdown("### 5️⃣ Discourse Integration (Class-wise WordClouds)")
+        target_values = df[target_col].unique()
+        for val in target_values:
+            st.markdown(f"**Class: {val}**")
+            subset_text = " ".join(df[df[target_col]==val][feature_col].astype(str))
+            wc_class = WordCloud(width=600, height=300, background_color="white", colormap="tab10").generate(subset_text)
+            st.image(wc_class.to_array())
 
-        # Charts
-        fig, (ax1, ax2) = plt.subplots(1,2, figsize=(16,6))
-        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4']
+    # ===== Target Distribution =====
+    with tabs[5]:
+        st.markdown("### 🎯 Target Column Distribution (Donut Chart)")
+        target_counts = df[target_col].value_counts().reset_index()
+        target_counts.columns = [target_col, 'Count']
+        fig_target = px.pie(target_counts, names=target_col, values='Count', hole=0.5,
+                            color=target_col, color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig_target.update_traces(textinfo='percent+label')
+        st.plotly_chart(fig_target, use_container_width=True)
 
-        # Bar chart
-        bars = ax1.bar(results_df["Model"], results_df["Accuracy_numeric"], color=colors, alpha=0.9, edgecolor='darkgray', linewidth=1.5)
-        bars[best_idx].set_color('#FFD93D')
-        bars[best_idx].set_edgecolor('black')
-        bars[best_idx].set_linewidth(2)
-        for i, val in enumerate(results_df["Accuracy_numeric"]):
-            ax1.text(i, val + 1, f"{val:.1f}%", ha='center', va='bottom', fontsize=12, fontweight='bold')
-        ax1.set_ylabel('Accuracy (%)')
-        ax1.set_title('Model Performance')
-        ax1.set_ylim(0, min(100, max(results_df["Accuracy_numeric"])+15))
-        ax1.grid(axis='y', alpha=0.3)
+    # ===== Fake News Detection Model =====
+    st.markdown("---")
+    st.subheader("🤖 Fake News Detection Model (TF-IDF + Logistic Regression)")
 
-        # Donut chart
-        wedges, texts, autotexts = ax2.pie(
-            results_df["Accuracy_numeric"], 
-            labels=results_df["Model"], 
-            autopct=lambda p: f'{p:.1f}%' if p > 0 else '', 
-            startangle=90, 
-            colors=colors,
-            explode=[0.1 if i==best_idx else 0 for i in range(len(results_df))]
-        )
-        centre_circle = plt.Circle((0,0),0.7,fc='white')
-        ax2.add_artist(centre_circle)
-        for autotext in autotexts:
-            autotext.set_fontweight('bold')
-            autotext.set_color('black')
-        ax2.set_title('Performance Distribution')
-        plt.tight_layout()
-        st.pyplot(fig)
+    # Train model
+    X = df[feature_col].astype(str)
+    y = df[target_col]
+    tfidf = TfidfVectorizer(stop_words='english', max_features=5000)
+    X_tfidf = tfidf.fit_transform(X)
+    X_train, X_test, y_train, y_test = train_test_split(X_tfidf, y, test_size=0.2, random_state=42)
+    model = LogisticRegression(max_iter=500)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    acc = accuracy_score(y_test, y_pred)
+    st.success(f"Model Trained Successfully! Accuracy: {acc*100:.2f}%")
 
-        # Metrics display
-        st.write("### 🏆 Operational Benchmarks")
-        cols = st.columns(len(results_df))
-        for idx, row in results_df.iterrows():
-            with cols[idx]:
-                if row["Accuracy"] == "Error":
-                    st.metric(label=row["Model"], value="Error")
-                elif idx == best_idx:
-                    st.metric(label=f"🥇 {row['Model']}", value=f"{row['Accuracy_numeric']:.1f}%", delta="Best")
-                else:
-                    delta = -round(results_df.loc[best_idx,"Accuracy_numeric"] - row["Accuracy_numeric"],1)
-                    st.metric(label=row["Model"], value=f"{row['Accuracy_numeric']:.1f}%", delta=f"{delta}%")
+    # Classification Report
+    report_df = pd.DataFrame(classification_report(y_test, y_pred, output_dict=True)).T
+    st.dataframe(report_df)
 
-        # Results table
-        st.write("### 📋 Detailed Results")
-        display_df = results_df.copy()
-        display_df["Accuracy_display"] = display_df["Accuracy_numeric"].apply(lambda x: f"{x:.1f}%" if x !=0 else "Error")
-        display_df["Rank"] = range(1, len(display_df)+1)
-        st.dataframe(display_df[["Rank","Model","Accuracy_display"]], use_container_width=True)
+    # Predict user input
+    st.markdown("### ✍️ Test Your Own Text")
+    user_input = st.text_area("Enter news text here:")
+    if st.button("Predict"):
+        if user_input.strip() != "":
+            user_vec = tfidf.transform([user_input])
+            prediction = model.predict(user_vec)[0]
+            st.info(f"Prediction: **{prediction}**")
+        else:
+            st.warning("Please enter some text to predict.")
 
 else:
-    st.info("👆 Upload a CSV file to start analysis.")
-
-# ============================
-# Styling
-# ============================
-st.markdown("""
-<style>
-.stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
-div[data-testid="metric-container"] { background-color:#f0f2f6; padding:10px; border-radius:10px; border-left:4px solid #1f77b4;}
-</style>
-""", unsafe_allow_html=True)
+    st.info("Please upload a CSV file to get started.")
