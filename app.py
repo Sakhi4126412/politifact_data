@@ -168,4 +168,3 @@ if st.button("Predict"):
         st.info(f"Prediction: **{prediction}**")
     else:
         st.warning("Please enter some text to predict.")
-modify code with different ML models for model training and recommendation
